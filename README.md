@@ -1,8 +1,10 @@
 # Semantic Segmentation
 ### Introduction
-In this project, you'll label the pixels of a road in images using a Fully Convolutional Network (FCN).
+In this project, I will label the pixels of a road in images using a Fully Convolutional Network (FCN).
+
 To review my design and implementation of the semantic segmentation project, please read [Semantic Segmentation Design Workbook](semantic-segmentation-design-workbook.org) 
 
+Below is the original content of the README.md
 
 ### Setup
 ##### Frameworks and Packages
