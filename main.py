@@ -4,7 +4,9 @@ import helper
 import warnings
 from distutils.version import LooseVersion
 import project_tests as tests
+
 import matplotlib.pyplot as plt
+# import pdb
 
 # NUM_CLASSES = 2
 # IMAGE_SHAPE = (160, 576)
@@ -151,9 +153,9 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
 
     print("Training...")
     print()
-    losses = []
     for epoch in range(epochs):
         print("EPOCH {} ...".format(epoch))
+        losses = []
         for image, label in get_batches_fn(batch_size):
             # performe training
             _, loss = sess.run([train_op, cross_entropy_loss],
@@ -161,7 +163,10 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
                                           correct_label: label,
                                           keep_prob: LEARNING_RATE,
                                           learning_rate: DROPOUT})
+            # pdb.set_trace()
             losses.append(loss)  # record loss for plotting
+            print("loss: {:.3f}".format(loss))
+        print()
         #end of for image, label
         average_loss = sum(losses)/len(losses)
         average_losses.append(average_loss)
