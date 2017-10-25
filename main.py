@@ -4,6 +4,7 @@ import helper
 import warnings
 from distutils.version import LooseVersion
 import project_tests as tests
+import matplotlib.pyplot as plt
 
 # NUM_CLASSES = 2
 # IMAGE_SHAPE = (160, 576)
@@ -41,20 +42,20 @@ def load_vgg(sess, vgg_path):
       vgg_layer4_out_tensor_name = 'layer4_out:0'
       vgg_layer7_out_tensor_name = 'layer7_out:0'
 
-      tf.save_model.loader.load(sess, [vgg_tag], vgg_tag)
+      tf.saved_model.loader.load(sess, [vgg_tag], vgg_path)
       graph = tf.get_default_graph()
       image_input = graph.get_tensor_by_name(vgg_input_tensor_name)
       keep_prob   = graph.get_tensor_by_name(vgg_keep_prob_tensor_name)
-      layer3_out_raw = graph.get_tensor_by_name(vgg_layer3_out_tensor_name)
-      layer4_out_raw = graph.get_tensor_by_name(vgg_layer4_out_tensor_name)
-      layer7_out = graph.get_tensor_by_name(vgg_layer7_out_tensor_name)
+      layer3_out  = graph.get_tensor_by_name(vgg_layer3_out_tensor_name)
+      layer4_out  = graph.get_tensor_by_name(vgg_layer4_out_tensor_name)
+      layer7_out  = graph.get_tensor_by_name(vgg_layer7_out_tensor_name)
 
       # the following scaling is based on the suggestion from
       # https://discussions.udacity.com/t/here-is-some-advice-and-clarifications-about-the-semantic-segmentation-project/403100
-      layer3_out_scaled = tf.multiply(layer3_out_raw, 0.0001, name='layer3_out_scaled')
-      layer4_out_scaled = tf.multiply(layer4_out_raw, 0.01, name='layer4_out_scaled')
+      # layer3_out_scaled = tf.multiply(layer3_out_raw, 0.0001, name='layer3_out_scaled')
+      # layer4_out_scaled = tf.multiply(layer4_out_raw, 0.01, name='layer4_out_scaled')
 
-      return image_input, keep_prob, layer3_out_scaled, layer4_out_scaled, layer7_out
+      return image_input, keep_prob, layer3_out, layer4_out, layer7_out
 tests.test_load_vgg(load_vgg, tf)
 
 def conv_1x1(layer, layer_name, num_classes):
@@ -62,7 +63,7 @@ def conv_1x1(layer, layer_name, num_classes):
     'return the 1x1 convolution of a layer
     """
     return tf.layers.conv2d(inputs=layer,
-                            num_classes,
+                            filters=num_classes,
                             kernel_size=(1, 1),
                             strides=(1, 1),
                             padding= 'same',
@@ -73,7 +74,7 @@ def upsample(layer, kernel, stride, layer_name, num_classes):
     """
     return the convolution transpose of the layer given kernel and stride.
     """
-    return tf.layers.conv2d_traspose(inputs=layer,
+    return tf.layers.conv2d_transpose(inputs=layer,
                                      filters=num_classes,
                                      kernel_size=(kernel, kernel),
                                      strides=(stride, stride),
@@ -123,7 +124,7 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
 
     # define loss function
     cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits,
-                                                                                label=correct_label))
+                                                                                labels=correct_label))
     # training operation
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
     train_op = optimizer.minimize(cross_entropy_loss)
@@ -146,7 +147,7 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param learning_rate: TF Placeholder for learning rate
     """
     # TODO: Implement function
-    // sess.run(tf.global_variables_initializer())
+    # sess.run(tf.global_variables_initializer())
 
     print("Training...")
     print()
@@ -163,9 +164,9 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
             losses.append(loss)  # record loss for plotting
         #end of for image, label
         average_loss = sum(losses)/len(losses)
-        average_losses = append(average_losses)
+        average_losses.append(average_loss)
 
-        print("Loss: = {:.3f}".format(loss))
+        print("Loss: = {:.3f}".format(average_loss))
     #end of for epoch
     print()
 tests.test_train_nn(train_nn)
@@ -195,7 +196,7 @@ def run():
 
         # TODO: Build NN using load_vgg, layers, and optimize function
         # TF placeholders
-        correct_label = tf.placeholde(tf.int32, [None, None, None, num_classes], name='correct_label')
+        correct_label = tf.placeholder(tf.int32, [None, None, None, num_classes], name='correct_label')
         learning_rate = tf.placeholder(tf.float32, name='learning_rate')
 
         input_image, keep_prob, layer3_out, layer4_out, layer7_out = load_vgg(sess, vgg_path)
@@ -206,7 +207,7 @@ def run():
         # TODO: Train NN using the train_nn function
 
         # initialize variables
-        sess.run(tf.gloabl_variables_initializer())
+        sess.run(tf.global_variables_initializer())
         sess.run(tf.local_variables_initializer())
 
         train_nn(sess, EPOCHS, BATCH_SIZE, get_batches_fn,
@@ -222,3 +223,6 @@ def run():
 if __name__ == '__main__':
     run()
     print(average_losses)
+    plt.plot(average_losses)
+    plt.show()
+    plt.savefig("./average_lossses.png")
