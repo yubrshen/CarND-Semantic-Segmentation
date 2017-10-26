@@ -20,21 +20,31 @@
 
 #+NAME:parameters
 #+BEGIN_SRC python :noweb yes :tangle :exports none
-  # NUM_CLASSES = 2
-  # IMAGE_SHAPE = (160, 576)
+  NUM_CLASSES = 2
+
+  IMAGE_SHAPE = (160, 576)
 
   EPOCHS = 20
   BATCH_SIZE = 1
 
-  LEARNING_RATE = 0.0009 # 0.0001
-  DROPOUT = 0.5 # 0.75
+  LEARNING_RATE = 0.0001 # 0.0009
+  DROPOUT = 0.75         # 0.5
 #+END_SRC
 
 * Global variables
 
 #+NAME:globals
 #+BEGIN_SRC python :noweb yes :tangle :exports none
-  average_losses = []             # for plotting the average_losses
+  DATA_DIRECTORY = './data'
+  RUNS_DIRECTORY = './runs'
+  TRAINING_DATA_DIRECTORY ='./data/data_road/training'
+  NUMBER_OF_IMAGES = len(glob.glob('./data/data_road/training/calib/*.*'))
+  VGG_PATH = './data/vgg'
+
+  average_losses = [] # Used for plotting to visualize if our training is going well given parameters
+  correct_label = tf.placeholder(tf.float32, [None, IMAGE_SHAPE[0], IMAGE_SHAPE[1], NUM_CLASSES])
+  learning_rate = tf.placeholder(tf.float32)
+  keep_prob = tf.placeholder(tf.float32)
 #+END_SRC
 
 * load_vgg
@@ -79,138 +89,141 @@ The construction of the FCN model.
 
 #+NAME:conv_1x1
 #+BEGIN_SRC python :noweb yes :tangle :exports none
-  def conv_1x1(layer, layer_name, num_classes):
-      """
-      'return the 1x1 convolution of a layer
-      """
-      return tf.layers.conv2d(inputs=layer,
-                              filters=num_classes,
-                              kernel_size=(1, 1),
-                              strides=(1, 1),
-                              padding= 'same',
-                              kernel_initializer= tf.random_normal_initializer(stddev=0.01),
-                              kernel_regularizer= tf.contrib.layers.l2_regularizer(1e-3),
-                              name=layer_name)
+  def conv_1x1(layer, layer_name):
+    """ Return the output of a 1x1 convolution of a layer """
+    return tf.layers.conv2d(inputs = layer,
+                            filters =  NUM_CLASSES,
+                            kernel_size = (1, 1),
+                            strides = (1, 1),
+                            padding= 'same',
+                            kernel_initializer= tf.random_normal_initializer(stddev=0.01),
+                            kernel_regularizer= tf.contrib.layers.l2_regularizer(1e-3),
+                            name = layer_name)
 #+END_SRC
 
 #+NAME:upsample
 #+BEGIN_SRC python :noweb yes :tangle :exports none
-  def upsample(layer, kernel, stride, layer_name, num_classes):
-      """
-      return the convolution transpose of the layer given kernel and stride.
-      """
-      return tf.layers.conv2d_transpose(inputs=layer,
-                                       filters=num_classes,
-                                       kernel_size=(kernel, kernel),
-                                       strides=(stride, stride),
-                                       padding='same',
-                                       kernel_initializer= tf.random_normal_initializer(stddev=0.01),
-                                       kernel_regularizer= tf.contrib.layers.l2_regularizer(1e-3),
-                                       name=layer_name)
+  def upsample(layer, k, s, layer_name):
+    """ Return the output of transpose convolution given kernel_size k and strides s """
+    return tf.layers.conv2d_transpose(inputs = layer,
+                                      filters = NUM_CLASSES,
+                                      kernel_size = (k, k),
+                                      strides = (s, s),
+                                      padding = 'same',
+                                      kernel_initializer= tf.random_normal_initializer(stddev=0.01),
+                                      kernel_regularizer= tf.contrib.layers.l2_regularizer(1e-3),
+                                      name = layer_name)
 #+END_SRC
 
 #+NAME:layers
 #+BEGIN_SRC python :noweb yes :tangle :exports none
   <<conv_1x1>>
   <<upsample>>
-  def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
-      """
-      Create the layers for a fully convolutional network.  Build skip-layers using the vgg layers.
-      :param vgg_layer7_out: TF Tensor for VGG Layer 3 output
-      :param vgg_layer4_out: TF Tensor for VGG Layer 4 output
-      :param vgg_layer3_out: TF Tensor for VGG Layer 7 output
-      :param num_classes: Number of classes to classify
-      :return: The Tensor for the last layer of output
-      """
-      # TODO: Implement function
-      l7_conv = conv_1x1(vgg_layer7_out, 'l7_conv', num_classes)
-      l4_conv = conv_1x1(vgg_layer4_out, 'l4_conv', num_classes)
-      l3_conv = conv_1x1(vgg_layer3_out, 'l3_conv', num_classes)
+  def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes = NUM_CLASSES):
+    """
+    Create the layers for a fully convolutional network.  Build skip-layers using the vgg layers.
+    vgg_layerX_out: TF Tensor for VGG Layer X output
+    num_classes: Number of classes to classify
+    return: The Tensor for the last layer of output
+    """
 
-      l7_conv_upsample = upsample(l7_conv, 4, 2, 'l7_conv_upsample', num_classes)
-      # add skip l4_conv
-      l4_skip_added = tf.add(l7_conv_upsample, l4_conv)
-      l4_skip_added_upsample = upsample(l4_skip_added, 4, 2, "l4_skip_added_upsample", num_classes)
-      l3_skip_added = tf.add(l4_skip_added_upsample, l3_conv)
-      output = upsample(l3_skip_added, 16, 8, 'output', num_classes)
+    # Use a shorter variable name for simplicity
+    layer3, layer4, layer7 = vgg_layer3_out, vgg_layer4_out, vgg_layer7_out
 
-      # example of print out the dimension for debug
-      # tf.Print(output, [tf.shape(output)[1:3]])
-      return output
+    # Apply a 1x1 convolution to encoder layers
+    l3_conv = conv_1x1(layer = layer3, layer_name = "layer3conv1x1")
+    l4_conv = conv_1x1(layer = layer4, layer_name = "layer4conv1x1")
+    l7_conv = conv_1x1(layer = layer7, layer_name = "layer7conv1x1")
+
+    # Add decoder layers to the network with skip connections and upsampling
+    # Note: the kernel size and strides are the same as the example in Udacity Lectures
+    #       Semantic Segmentation Scene Understanding Lesson 10-9: FCN-8 - Decoder
+    decoderlayer1 = upsample(layer = l7_conv, k = 4, s = 2, layer_name = "decoderlayer1")
+    decoderlayer2 = tf.add(decoderlayer1, l4_conv, name = "decoderlayer2")
+    decoderlayer3 = upsample(layer = decoderlayer2, k = 4, s = 2, layer_name = "decoderlayer3")
+    decoderlayer4 = tf.add(decoderlayer3, l3_conv, name = "decoderlayer4")
+    decoderlayer_output = upsample(layer = decoderlayer4, k = 16, s = 8, layer_name = "decoderlayer_output")
+
+    return decoderlayer_output
 #+END_SRC
 
 * optimize
 
 #+NAME:optimize
 #+BEGIN_SRC python :noweb yes :tangle :exports none
-  def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
-      """
-      Build the TensorFLow loss and optimizer operations.
-      :param nn_last_layer: TF Tensor of the last layer in the neural network
-      :param correct_label: TF Placeholder for the correct label image
-      :param learning_rate: TF Placeholder for the learning rate
-      :param num_classes: Number of classes to classify
-      :return: Tuple of (logits, train_op, cross_entropy_loss)
-      """
-      # TODO: Implement function
-      # make logits a 2D tensor where each row represents a pxel and each column a class
-      logits = tf.reshape(nn_last_layer, (-1, num_classes))
-      correct_label = tf.reshape(correct_label, (-1, num_classes))
+  def optimize(nn_last_layer, correct_label, learning_rate, num_classes = NUM_CLASSES):
+    """
+    Build the TensorFLow loss and optimizer operations.
+    nn_last_layer: TF Tensor of the last layer in the neural network
+    correct_label: TF Placeholder for the correct label image
+    learning_rate: TF Placeholder for the learning rate
+    num_classes: Number of classes to classify
+    return: Tuple of (logits, train_op, cross_entropy_loss)
+    """
+    # Reshape 4D tensors to 2D, each row represents a pixel, each column a class
+    logits = tf.reshape(nn_last_layer, (-1, num_classes))
+    class_labels = tf.reshape(correct_label, (-1, num_classes))
 
-      # define loss function
-      cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits,
-                                                                                  labels=correct_label))
-      # training operation
-      optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-      train_op = optimizer.minimize(cross_entropy_loss)
-      return logits, train_op, cross_entropy_loss
+    # The cross_entropy_loss is the cost which we are trying to minimize to yield higher accuracy
+    cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits = logits, labels = class_labels)
+    cross_entropy_loss = tf.reduce_mean(cross_entropy)
+
+    # Use AdamOptimizer per suggestion from the walk-through
+    train_op = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy_loss)
+
+    return logits, train_op, cross_entropy_loss
+
 #+END_SRC
 
 * train_nn
 
 #+NAME:train_nn
 #+BEGIN_SRC python :noweb yes :tangle :exports none
-  def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
+  def train_nn(sess, epochs, batch_size, get_batches_fn, train_op,
+               cross_entropy_loss, input_image,
                correct_label, keep_prob, learning_rate):
-      """
-      Train neural network and print out the loss during training.
-      :param sess: TF Session
-      :param epochs: Number of epochs
-      :param batch_size: Batch size
-      :param get_batches_fn: Function to get batches of training data.  Call using get_batches_fn(batch_size)
-      :param train_op: TF Operation to train the neural network
-      :param cross_entropy_loss: TF Tensor for the amount of loss
-      :param input_image: TF Placeholder for input images
-      :param correct_label: TF Placeholder for label images
-      :param keep_prob: TF Placeholder for dropout keep probability
-      :param learning_rate: TF Placeholder for learning rate
-      """
-      # TODO: Implement function
-      # sess.run(tf.global_variables_initializer())
+    """
+    Train neural network and print out the loss during training.
+    sess: TF Session
+    epochs: Number of epochs
+    batch_size: Batch size
+    get_batches_fn: Function to get batches of training data.  Call using get_batches_fn(batch_size)
+    train_op: TF Operation to train the neural network
+    cross_entropy_loss: TF Tensor for the amount of loss
+    input_image: TF Placeholder for input images
+    correct_label: TF Placeholder for label images
+    keep_prob: TF Placeholder for dropout keep probability
+    learning_rate: TF Placeholder for learning rate
+    """
 
-      print("Training...")
-      print()
-      for epoch in range(epochs):
-          print("EPOCH {} ...".format(epoch))
-          losses = []
-          for image, label in get_batches_fn(batch_size):
-              # performe training
-              _, loss = sess.run([train_op, cross_entropy_loss],
-                                 feed_dict={input_image: image,
-                                            correct_label: label,
-                                            keep_prob: LEARNING_RATE,
-                                            learning_rate: DROPOUT})
-              # pdb.set_trace()
-              losses.append(loss)  # record loss for plotting
-              print("loss: {:.3f}".format(loss))
-          print()
-          #end of for image, label
-          average_loss = sum(losses)/len(losses)
-          average_losses.append(average_loss)
+    for epoch in range(EPOCHS):
+      losses = []
+      i = 0
+      for images, labels in get_batches_fn(BATCH_SIZE):
+        feed = { input_image: images,
+                 correct_label: labels,
+                 keep_prob: DROPOUT,
+                 learning_rate: LEARNING_RATE }
+        _, loss = sess.run([train_op, cross_entropy_loss], feed_dict = feed)
+        i += 1
+        print("epoch: ", i, " partial loss:", loss)
+        losses.append(loss)
 
-          print("Loss: = {:.3f}".format(average_loss))
-      #end of for epoch
-      print()
+      average_loss = sum(losses) / len(losses)
+      average_losses.append(average_loss)
+
+      print("epoch: ", epoch + 1, " of ", EPOCHS, "average loss: ", average_loss)
+#+END_SRC
+
+* run_tests
+
+#+NAME:run_tests
+#+BEGIN_SRC python :noweb yes :tangle :exports none
+  def run_tests():
+    tests.test_layers(layers)
+    tests.test_optimize(optimize)
+    tests.test_for_kitti_dataset(DATA_DIRECTORY)
+    tests.test_train_nn(train_nn)
 #+END_SRC
 
 * run
@@ -218,53 +231,39 @@ The construction of the FCN model.
 #+NAME:run
 #+BEGIN_SRC python :noweb yes :tangle :exports none
   def run():
-      num_classes = 2
-      image_shape = (160, 576)
-      data_dir = './data'
-      runs_dir = './runs'
-      tests.test_for_kitti_dataset(data_dir)
+    """ Run a train a model and save output images resulting from the test image fed on the trained model """
 
-      # Download pretrained vgg model
-      helper.maybe_download_pretrained_vgg(data_dir)
+    # Get vgg model if we can't find it where it should be
+    helper.maybe_download_pretrained_vgg(DATA_DIRECTORY)
 
-      # OPTIONAL: Train and Inference on the cityscapes dataset instead of the Kitti dataset.
-      # You'll need a GPU with at least 10 teraFLOPS to train on.
-      #  https://www.cityscapes-dataset.com/
+    # A function to get batches
+    get_batches_fn = helper.gen_batch_function(TRAINING_DATA_DIRECTORY, IMAGE_SHAPE)
 
-      with tf.Session() as sess:
-          # Path to vgg model
-          vgg_path = os.path.join(data_dir, 'vgg')
-          # Create function to get batches
-          get_batches_fn = helper.gen_batch_function(os.path.join(data_dir, 'data_road/training'), image_shape)
+    with tf.Session() as session:
 
-          # OPTIONAL: Augment Images for better results
-          #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
+      # Returns the three layers, keep probability and input layer from the vgg architecture
+      image_input, keep_prob, layer3, layer4, layer7 = load_vgg(session, VGG_PATH)
 
-          # TODO: Build NN using load_vgg, layers, and optimize function
-          # TF placeholders
-          correct_label = tf.placeholder(tf.int32, [None, None, None, num_classes], name='correct_label')
-          learning_rate = tf.placeholder(tf.float32, name='learning_rate')
+      # The resulting network architecture from adding a decoder on top of the given vgg model
+      model_output = layers(layer3, layer4, layer7, NUM_CLASSES)
 
-          input_image, keep_prob, layer3_out, layer4_out, layer7_out = load_vgg(sess, vgg_path)
-          model_output = layers(layer3_out, layer4_out, layer7_out, num_classes)
+      # Returns the output logits, training operation and cost operation to be used
+      # - logits: each row represents a pixel, each column a class
+      # - train_op: function used to get the right parameters to the model to correctly label the pixels
+      # - cross_entropy_loss: function outputting the cost which we are minimizing, lower cost should yield higher accuracy
+      logits, train_op, cross_entropy_loss = optimize(model_output, correct_label, learning_rate, NUM_CLASSES)
 
-          logits, train_op, cross_entropy_loss = optimize(model_output, correct_label, learning_rate, num_classes);
+      # Initialize all variables
+      session.run(tf.global_variables_initializer())
+      session.run(tf.local_variables_initializer())
 
-          # TODO: Train NN using the train_nn function
+      # Train the neural network
+      train_nn(session, EPOCHS, BATCH_SIZE, get_batches_fn,
+               train_op, cross_entropy_loss, image_input,
+               correct_label, keep_prob, learning_rate)
 
-          # initialize variables
-          sess.run(tf.global_variables_initializer())
-          sess.run(tf.local_variables_initializer())
-
-          train_nn(sess, EPOCHS, BATCH_SIZE, get_batches_fn,
-                   train_op, cross_entropy_loss, input_image, correct_label, keep_prob, learning_rate)
-
-          # TODO: Save inference data using helper.save_inference_samples
-          helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
-
-          # OPTIONAL: Apply the trained model to a video
-
-
+      # Run the model with the test images and save each painted output image (roads painted green)
+      helper.save_inference_samples(RUNS_DIRECTORY, DATA_DIRECTORY, session, IMAGE_SHAPE, logits, keep_prob, image_input)
 #+END_SRC
 
 * main
@@ -274,11 +273,11 @@ The construction of the FCN model.
   import tensorflow as tf
   import helper
   import warnings
+  import glob
+  import matplotlib.pyplot as plt
+
   from distutils.version import LooseVersion
   import project_tests as tests
-
-  import matplotlib.pyplot as plt
-  # import pdb
 
   <<parameters>>
   <<globals>>
@@ -294,20 +293,23 @@ The construction of the FCN model.
       print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
 
   <<load_vgg>>
-  tests.test_load_vgg(load_vgg, tf)
+  # tests.test_load_vgg(load_vgg, tf)
 
   <<layers>>
-  tests.test_layers(layers)
+  # tests.test_layers(layers)
 
   <<optimize>>
-  tests.test_optimize(optimize)
+  # tests.test_optimize(optimize)
 
   <<train_nn>>
-  tests.test_train_nn(train_nn)
+  # tests.test_train_nn(train_nn)
+
+  <<run_tests>>
 
   <<run>>
 
   if __name__ == '__main__':
+      run_tests()
       run()
       print(average_losses)
       plt.plot(average_losses)
