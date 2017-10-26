@@ -37,7 +37,14 @@
 
 * Performance
 
-   Here is the average losses cross an epoch with number of epochs 5 and batch size 1:
+  I have tried a few combinations of hyper-parameters of learning rate, epochs, and batch size. I found that
+  the learning performance is not quite sensitive to the hyper-parameters. I eventually adopted the combinations of the following:
+
+  - learning rate: 0.0009
+  - batch size: 1
+  - epochs 5, and 20
+
+  Here is the average losses cross an epoch with number of epochs 5 and batch size 1:
 
   [[./average_lossses.png]]
 
