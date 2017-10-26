@@ -42,7 +42,7 @@
 
   Here is the loss curve:
 
-  [[./loss-curve.png]]
+  [[./average_lossses.png]]
 
 * Source Code
 
