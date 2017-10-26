@@ -18,20 +18,22 @@
 
 * Introduction
 
-  This project use FCN (Full Convolution Network) to do semantic segmentation of scene captured by dashcamera mounted on the front of a autonomous vehicle.
-  The FCN is expected to label the pixels in the images whether the pixels belong to road surface or not. If they belongs to road surface, the green color would
-  be overlaid onto the area identified as road.
+  This project use FCN (Full Convolution Network) to do semantic segmentation of scenes captured by dashcamera mounted on the front of a autonomous vehicle.
+  The FCN is expected to label the pixels in the images whether the pixels belong to road surface or not. If they belong to road surface, the green color would
+  be overlaid onto the corresponding area.
 
 * Architecture
 
-  It uses a FCN with pre-trained VGG as encoder front-end. Then it use 1x1 convolution with classes of "road" and "non-road" to VGG's layer 7, layer 4, and layer 4
-  learn to classify the pixel areas into road or non-road. The 1x1 convolution preserves the image's topology relationship.
+  The architecture follows that defined in [[https://people.eecs.berkeley.edu/~jonlong/long_shelhamer_fcn.pdf][Fully Convolutional Networks for Semantic Segmentation]]
+
+  It uses a FCN with pre-trained VGG as encoder front-end. Then it uses 1x1 convolution with classes of "road" and "non-road" to VGG's layer 7, layer 4, and layer 4
+  to be further trained to classify the pixel areas into road or non-road. The 1x1 convolution preserves the image's topology relationship.
 
   Then it uses convolution transpose to extrapolate the classification to match the original image size to arrive the image classification. Before reaching the original image's resolution,
   in order to provide richer topology information output from layers closer to the input to VGG (layer 4 and 3) are abstracted by 1x1 convolution, and the convoluted outcome is combined and
   eventually convolution transposed into the original image size.
 
-  For details of the network, please see the section "layers".
+  For details of the network, please see source in the section "layers".
 
 * Performance
 
@@ -310,6 +312,10 @@ The following are the source code.
  #+END_SRC
 
 ** main
+
+   Here is the top level main program. The lines such as =<<parameters>>= represents code block named in the bracket. This is a way to represent
+   complex source in terms of hierarchy. The code blocks referenced here have been introduced earlier in the document.
+
  #+NAME:main
  #+BEGIN_SRC python :noweb tangle :tangle ./main.py
    import os.path
@@ -353,5 +359,5 @@ The following are the source code.
        print(average_losses)
        plt.plot(average_losses)
        plt.savefig("./average_lossses.png")
-       plt.show()
+       # plt.show()
  #+END_SRC
