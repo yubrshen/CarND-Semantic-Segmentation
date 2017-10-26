@@ -12,7 +12,7 @@ NUM_CLASSES = 2
 
 IMAGE_SHAPE = (160, 576)
 
-EPOCHS = 20
+EPOCHS = 5 # 20 with very good segmentation outcome
 BATCH_SIZE = 1
 
 LEARNING_RATE = 0.0001 # 0.0009
@@ -68,7 +68,6 @@ def load_vgg(sess, vgg_path):
       # layer4_out_scaled = tf.multiply(layer4_out_raw, 0.01, name='layer4_out_scaled')
 
       return image_input, keep_prob, layer3_out, layer4_out, layer7_out
-# tests.test_load_vgg(load_vgg, tf)
 
 def conv_1x1(layer, layer_name):
   """ Return the output of a 1x1 convolution of a layer """
@@ -116,7 +115,6 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes = NUM_CLA
   decoderlayer_output = upsample(layer = decoderlayer4, k = 16, s = 8, layer_name = "decoderlayer_output")
 
   return decoderlayer_output
-# tests.test_layers(layers)
 
 def optimize(nn_last_layer, correct_label, learning_rate, num_classes = NUM_CLASSES):
   """
@@ -140,7 +138,6 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes = NUM_CLAS
 
   return logits, train_op, cross_entropy_loss
 
-# tests.test_optimize(optimize)
 
 def train_nn(sess, epochs, batch_size, get_batches_fn, train_op,
              cross_entropy_loss, input_image,
@@ -176,7 +173,6 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op,
     average_losses.append(average_loss)
 
     print("epoch: ", epoch + 1, " of ", EPOCHS, "average loss: ", average_loss)
-# tests.test_train_nn(train_nn)
 
 def run_tests():
   tests.test_layers(layers)
@@ -224,5 +220,5 @@ if __name__ == '__main__':
     run()
     print(average_losses)
     plt.plot(average_losses)
-    plt.show()
     plt.savefig("./average_lossses.png")
+    plt.show()
