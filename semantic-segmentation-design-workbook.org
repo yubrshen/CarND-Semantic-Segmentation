@@ -37,12 +37,17 @@
 
   By random spot check, the semantic segmentation result is remarkably good. Here are some samples:
 
-  [[./runs/1508981417.593911/um_000007.png]]
+| EPOCHS = 5         | EPOCHS = 20        |
+| [[./umm_00016_E5.png]] | [[./umm_00016_E5.png]] |
+|                    |                    |
 
-
-  Here is the loss curve:
+  Here is the average losses cross an epoch with number of epochs 5 and batch size 1:
 
   [[./average_lossses.png]]
+
+  I also tried with number of epochs 10 and batch size 1.
+
+  The average losses cross an epoch reduces very fast and soon stabilize relatively.
 
 * Source Code
 
