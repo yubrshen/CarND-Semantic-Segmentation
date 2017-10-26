@@ -35,19 +35,25 @@
 
 * Performance
 
-  By random spot check, the semantic segmentation result is remarkably good. Here are some samples:
-
-| EPOCHS = 5         | EPOCHS = 20        |
-| [[./umm_00016_E5.png]] | [[./umm_00016_E5.png]] |
-|                    |                    |
-
-  Here is the average losses cross an epoch with number of epochs 5 and batch size 1:
+   Here is the average losses cross an epoch with number of epochs 5 and batch size 1:
 
   [[./average_lossses.png]]
 
   I also tried with number of epochs 10 and batch size 1.
 
   The average losses cross an epoch reduces very fast and soon stabilize relatively.
+
+ By random spot check, the semantic segmentation result is remarkably good. Here are some samples:
+
+| EPOCHS = 5         | EPOCHS = 20         |
+| [[./umm_00016_E5.png]] | [[./umm_00016_E20.png]] |
+| [[./um_000014_E5.png]] | [[./um_000014_E20.png]] |
+| [[./uu_000073_E5.png]] | [[./uu_000073_E20.png]] |
+|                    |                     |
+
+It seems that the leaning converges very fast. At the epochs = 5, the segmentation is almost good enough. While at epochs = 20,
+the segmentation is cleaner.
+
 
 * Source Code
 
